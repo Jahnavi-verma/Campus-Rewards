@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: test-client-id
+            client-secret: test-client-secret
+            scope: read:user
+
+app:
+  jwt:
+    secret: test-secret-key-minimum-32-chars-long!!
+    expiration-ms: 86400000
+  frontend-url: http://localhost:3000
+  python-backend-url: http://localhost:8000
+
+SESSION_SECRET: test-secret-key-minimum-32-chars-long!!

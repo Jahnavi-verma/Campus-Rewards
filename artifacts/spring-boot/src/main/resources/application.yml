@@ -1,0 +1,43 @@
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /api
+
+spring:
+  datasource:
+    url: ${SUPABASE_DB_URL}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        temp:
+          use_jdbc_metadata_defaults: false
+        boot:
+          allow_jdbc_metadata_access: false
+
+app:
+  jwt:
+    secret: ${SESSION_SECRET}
+    expiration-ms: 86400000
+  frontend-url: ${REPLIT_DOMAINS:http://localhost:8080}
+  friend-dev-url: ${REPLIT_DOMAINS:http://localhost:8080}
+  python-backend-url: ${PYTHON_BACKEND_URL:http://localhost:8000}
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.campusrecycle: INFO
+    org.springframework.security: WARN
