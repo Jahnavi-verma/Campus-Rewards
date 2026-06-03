@@ -5,8 +5,9 @@
  * Campus Recycle Rewards API
  * OpenAPI spec version: 0.1.0
  */
+import type { UserDto } from './userDto';
 
-export interface HealthStatus {
-  status: string;
-  service?: string;
+export interface AuthResponse {
+  token: string;
+  user: UserDto;
 }
