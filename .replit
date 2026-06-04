@@ -8,7 +8,7 @@ deploymentTarget = "autoscale"
 args = [
   "bash",
   "-c",
-  "PORT=3000 BASE_PATH='/' pnpm run build && mvn -f artifacts/spring-boot/pom.xml clean package -DskipTests",
+  "mvn -f artifacts/spring-boot/pom.xml clean package -DskipTests",
 ]
 env = { "CI" = "true" }
 
@@ -16,7 +16,7 @@ env = { "CI" = "true" }
 args = [
   "bash",
   "-c",
-  "java -jar artifacts/spring-boot/target/*.jar & pnpm --filter @workspace/api-server run start",
+  "java -jar artifacts/spring-boot/target/*.jar",
 ]
 
 [deployment.postBuild]
@@ -33,10 +33,6 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
-
-[[ports]]
-localPort = 3000
-externalPort = 3001
 
 [[ports]]
 localPort = 8080
