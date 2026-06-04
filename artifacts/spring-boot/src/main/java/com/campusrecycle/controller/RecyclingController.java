@@ -1,21 +1,21 @@
 package com.campusrecycle.controller;
 
-import com.campusrecycle.dto.SubmissionDto;
 import com.campusrecycle.dto.SubmissionRequest;
-import com.campusrecycle.dto.QrClaimRequest;
-import com.campusrecycle.dto.QrClaimResponse;
 import com.campusrecycle.model.RecyclingSubmission;
 import com.campusrecycle.service.RecyclingSubmissionService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
+import com.campusrecycle.dto.QrClaimRequest;
+import com.campusrecycle.dto.QrClaimResponse;
+import com.campusrecycle.dto.SubmissionDto;
 
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/recycling")
-@CrossOrigin(origins = "*") // 🌐 Enables painless connections from Expo Go mobile apps
+@CrossOrigin(origins = "*")
 public class RecyclingController {
 
     private final RecyclingSubmissionService submissionService;
@@ -25,7 +25,7 @@ public class RecyclingController {
     }
 
     /**
-     * 📱 NEW: POST /recycling/scan-qr
+     * 📱 POST /recycling/scan-qr
      * Triggered automatically after scanning the hardware smart-bin's monitor QR code.
      * Expects body format: { "sessionId": "session_1780465540860" }
      */
@@ -40,7 +40,7 @@ public class RecyclingController {
         }
 
         try {
-            // Processing logic using values updated by Python hardware in Firebase
+            // Step 7 Logic Complete: Processes transaction values and returns standardized QrClaimResponse layout
             String successMsg = submissionService.processQrClaim(userId, sessionId);
             return ResponseEntity.ok(new QrClaimResponse("SUCCESS", successMsg));
         } catch (Exception e) {
@@ -48,7 +48,7 @@ public class RecyclingController {
         }
     }
 
-    // --- Legacy Framework Methods Intact ---
+    // --- Legacy Endpoints Kept Completely Intact ---
 
     @PostMapping("/submit")
     public ResponseEntity<?> submit(@RequestBody SubmissionRequest request,

@@ -63,7 +63,8 @@ public class SecurityConfig {
                     "/healthz",
                     "/actuator/**",
                     "/recycling/items",
-                    "/users/leaderboard"   
+                    "/users/leaderboard", 
+                    "/analytics/**" 
                 ).permitAll()
                 .anyRequest().authenticated()
             )

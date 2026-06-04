@@ -15,26 +15,24 @@ public class RecyclingSubmission {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "item_type", nullable = false, length = 50)
+    @Column(name = "item_type", nullable = false)
     private String itemType;
 
-    @Column(name = "quantity", nullable = false)
-    private int quantity = 1;
+    @Column(nullable = false)
+    private Integer quantity;
 
     @Column(name = "points_earned", nullable = false)
-    private int pointsEarned = 0;
+    private Integer pointsEarned;
 
-    @Column(length = 255)
+    @Column(nullable = false)
     private String location;
 
-    @Column(columnDefinition = "TEXT")
     private String notes;
 
-    // 🌟 FIXED: Changed nullable to true so Hibernate doesn't crash on existing old data rows
-    @Column(nullable = true, length = 50)
-    private String status = "APPROVED";
+    @Column(nullable = false)
+    private String status = "PENDING"; // PENDING, APPROVED, REJECTED
 
-    @Column(name = "submitted_at", nullable = false)
+    @Column(name = "submitted_at", nullable = false, updatable = false)
     private LocalDateTime submittedAt;
 
     @Column(name = "reviewed_at")
@@ -42,35 +40,28 @@ public class RecyclingSubmission {
 
     @PrePersist
     protected void onCreate() {
-        submittedAt = LocalDateTime.now();
+        this.submittedAt = LocalDateTime.now();
     }
 
+    // --- Add your standard Getters and Setters here ---
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
-
     public String getItemType() { return itemType; }
     public void setItemType(String itemType) { this.itemType = itemType; }
-
-    public int getQuantity() { return quantity; }
-    public void setQuantity(int quantity) { this.quantity = quantity; }
-
-    public int getPointsEarned() { return pointsEarned; }
-    public void setPointsEarned(int pointsEarned) { this.pointsEarned = pointsEarned; }
-
+    public Integer getQuantity() { return quantity; }
+    public void setQuantity(Integer quantity) { this.quantity = quantity; }
+    public Integer getPointsEarned() { return pointsEarned; }
+    public void setPointsEarned(Integer pointsEarned) { this.pointsEarned = pointsEarned; }
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
-
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
-
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
-
     public LocalDateTime getSubmittedAt() { return submittedAt; }
-
+    public void setSubmittedAt(LocalDateTime submittedAt) { this.submittedAt = submittedAt; }
     public LocalDateTime getReviewedAt() { return reviewedAt; }
     public void setReviewedAt(LocalDateTime reviewedAt) { this.reviewedAt = reviewedAt; }
 }

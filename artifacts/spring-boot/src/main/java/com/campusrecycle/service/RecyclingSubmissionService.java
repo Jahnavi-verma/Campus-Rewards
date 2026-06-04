@@ -5,26 +5,26 @@ import com.campusrecycle.model.RecyclingSubmission;
 import com.campusrecycle.model.User;
 import com.campusrecycle.repository.RecyclingSubmissionRepository;
 import com.campusrecycle.repository.UserRepository;
-import com.google.firebase.database.*;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RecyclingSubmissionService {
 
-    // 🌟 FIXED: Mapped precisely to match your Supabase column text layout
-    private static final String DB_BOTTLE = "Plastic Bottle";
-    private static final String DB_CAN = "Aluminum Can";
+    private static final String ITEM_PLASTIC = "Plastic Bottle";
+    private static final String ITEM_METAL = "Aluminum Can";
 
-    private static final Set<String> VALID_ITEMS = Set.of(DB_BOTTLE.toUpperCase(), DB_CAN.toUpperCase());
     private static final int POINTS_PER_PLASTIC = 10; 
     private static final int POINTS_PER_METAL = 15;
 
@@ -40,22 +40,26 @@ public class RecyclingSubmissionService {
         this.userService = userService;
     }
 
-    /**
-     * ⚡ REMADE: Automated QR Verification Flow with Status-State Validation
-     */
     @Transactional
     public String processQrClaim(Long userId, String sessionId) throws ExecutionException, InterruptedException {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
-        DatabaseReference ref = FirebaseDatabase.getInstance().getReference(sessionId);
+        DatabaseReference ref = FirebaseDatabase.getInstance()
+                .getReference("sessions")
+                .child(sessionId);
+
         CompletableFuture<DataSnapshot> future = new CompletableFuture<>();
 
         ref.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(DataSnapshot snapshot) { future.complete(snapshot); }
+            public void onDataChange(DataSnapshot snapshot) { 
+                future.complete(snapshot); 
+            }
             @Override
-            public void onCancelled(DatabaseError error) { future.completeExceptionally(error.toException()); }
+            public void onCancelled(DatabaseError error) { 
+                future.completeExceptionally(error.toException()); 
+            }
         });
 
         DataSnapshot snapshot = future.get();
@@ -93,12 +97,11 @@ public class RecyclingSubmissionService {
             throw new RuntimeException("No items were detected in this recycling session.");
         }
 
-        // 🌟 FIXED: Saves records with exact database strings ("Plastic Bottle" & "Aluminum Can")
         if (plasticCount > 0) {
-            saveAutomatedRecord(user, DB_BOTTLE, plasticCount, plasticCount * POINTS_PER_PLASTIC);
+            saveAutomatedRecord(user, ITEM_PLASTIC, plasticCount, plasticCount * POINTS_PER_PLASTIC);
         }
         if (metalCount > 0) {
-            saveAutomatedRecord(user, DB_CAN, metalCount, metalCount * POINTS_PER_METAL);
+            saveAutomatedRecord(user, ITEM_METAL, metalCount, metalCount * POINTS_PER_METAL);
         }
 
         userService.addPoints(userId, totalPoints);
@@ -111,15 +114,14 @@ public class RecyclingSubmissionService {
     private void saveAutomatedRecord(User user, String itemType, int qty, int points) {
         RecyclingSubmission submission = new RecyclingSubmission();
         submission.setUser(user);
-        submission.setItemType(itemType); // Set to "Plastic Bottle" or "Aluminum Can"
+        submission.setItemType(itemType); 
         submission.setQuantity(qty);
         submission.setPointsEarned(points);
         submission.setStatus("APPROVED");
+        submission.setLocation("Hostel Bin 1"); 
         submission.setNotes("Scanned via Campus Hardware Bin QR Code");
         submissionRepository.save(submission);
     }
-
-    // --- Original Framework Methods Updated for New Database Strings ---
 
     @Transactional
     public RecyclingSubmission submit(Long userId, SubmissionRequest request) {
@@ -129,17 +131,16 @@ public class RecyclingSubmissionService {
         String inputType = request.getItemType() != null ? request.getItemType().trim() : "";
         String dbItemType;
 
-        // 🌟 FIXED: Maps incoming user request inputs to the correct mixed-case DB row format
-        if (inputType.equalsIgnoreCase("BOTTLE") || inputType.equalsIgnoreCase(DB_BOTTLE)) {
-            dbItemType = DB_BOTTLE;
-        } else if (inputType.equalsIgnoreCase("CAN") || inputType.equalsIgnoreCase(DB_CAN)) {
-            dbItemType = DB_CAN;
+        if (inputType.equalsIgnoreCase("BOTTLE") || inputType.equalsIgnoreCase(ITEM_PLASTIC)) {
+            dbItemType = ITEM_PLASTIC;
+        } else if (inputType.equalsIgnoreCase("CAN") || inputType.equalsIgnoreCase(ITEM_METAL)) {
+            dbItemType = ITEM_METAL;
         } else {
             throw new IllegalArgumentException("Invalid item type '" + inputType + "'. Must be Plastic Bottle or Aluminum Can.");
         }
 
         int qty = Math.max(1, request.getQuantity());
-        int points = qty * (dbItemType.equals(DB_BOTTLE) ? POINTS_PER_PLASTIC : POINTS_PER_METAL);
+        int points = qty * (dbItemType.equals(ITEM_PLASTIC) ? POINTS_PER_PLASTIC : POINTS_PER_METAL);
 
         RecyclingSubmission submission = new RecyclingSubmission();
         submission.setUser(user);
@@ -176,13 +177,12 @@ public class RecyclingSubmissionService {
         long totalBottles = 0, totalCans = 0, totalPoints = 0;
         for (Object[] row : itemStats) {
             String type = (String) row[0];
-            long qty   = ((Number) row[2]).longValue();
+            long qty = ((Number) row[2]).longValue();
 
-            // 🌟 FIXED: Accurately checks against your real database strings
-            if (DB_BOTTLE.equals(type)) {
+            if (ITEM_PLASTIC.equals(type)) {
                 totalBottles = qty;
                 totalPoints += (qty * POINTS_PER_PLASTIC);
-            } else if (DB_CAN.equals(type)) {
+            } else if (ITEM_METAL.equals(type)) {
                 totalCans = qty;
                 totalPoints += (qty * POINTS_PER_METAL);
             }
@@ -190,10 +190,10 @@ public class RecyclingSubmissionService {
 
         return Map.of(
             "totalSubmissions", totalSubmissions,
-            "totalPoints",      totalPoints,
-            "totalBottles",     totalBottles,
-            "totalCans",        totalCans,
-            "totalUsers",       totalUsers
+            "totalPoints", totalPoints,
+            "totalBottles", totalBottles,
+            "totalCans", totalCans,
+            "totalUsers", totalUsers
         );
     }
 
@@ -228,8 +228,8 @@ public class RecyclingSubmissionService {
     public Map<String, Object> getItemInfo() {
         return Map.of(
             "items", List.of(
-                Map.of("type", DB_BOTTLE, "pointsPerItem", POINTS_PER_PLASTIC, "description", "Plastic bottle"),
-                Map.of("type", DB_CAN,    "pointsPerItem", POINTS_PER_METAL, "description", "Aluminium can")
+                Map.of("type", ITEM_PLASTIC, "pointsPerItem", POINTS_PER_PLASTIC, "description", "Plastic bottle"),
+                Map.of("type", ITEM_METAL, "pointsPerItem", POINTS_PER_METAL, "description", "Aluminum can")
             ),
             "welcomeBonus", 20
         );
