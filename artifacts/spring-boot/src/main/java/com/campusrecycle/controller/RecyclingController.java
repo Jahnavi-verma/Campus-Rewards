@@ -2,6 +2,8 @@ package com.campusrecycle.controller;
 
 import com.campusrecycle.dto.SubmissionDto;
 import com.campusrecycle.dto.SubmissionRequest;
+import com.campusrecycle.dto.QrClaimRequest;
+import com.campusrecycle.dto.QrClaimResponse;
 import com.campusrecycle.model.RecyclingSubmission;
 import com.campusrecycle.service.RecyclingSubmissionService;
 import org.springframework.http.ResponseEntity;
@@ -28,20 +30,21 @@ public class RecyclingController {
      * Expects body format: { "sessionId": "session_1780465540860" }
      */
     @PostMapping("/scan-qr")
-    public ResponseEntity<Map<String, String>> claimQrSession(Authentication authentication, 
-                                                              @RequestBody Map<String, String> body) {
+    public ResponseEntity<QrClaimResponse> claimQrSession(Authentication authentication, 
+                                                          @RequestBody QrClaimRequest request) {
         Long userId = Long.parseLong(authentication.getName());
-        String sessionId = body.get("sessionId");
+        String sessionId = request.getSessionId();
 
         if (sessionId == null || sessionId.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "sessionId is required", "status", "ERROR"));
+            return ResponseEntity.badRequest().body(new QrClaimResponse("ERROR", "sessionId is required"));
         }
 
         try {
+            // Processing logic using values updated by Python hardware in Firebase
             String successMsg = submissionService.processQrClaim(userId, sessionId);
-            return ResponseEntity.ok(Map.of("message", successMsg, "status", "SUCCESS"));
+            return ResponseEntity.ok(new QrClaimResponse("SUCCESS", successMsg));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.badRequest().body(new QrClaimResponse("ERROR", e.getMessage()));
         }
     }
 
