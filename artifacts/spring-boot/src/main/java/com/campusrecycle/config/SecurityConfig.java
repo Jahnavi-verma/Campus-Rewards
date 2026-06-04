@@ -1,24 +1,29 @@
 package com.campusrecycle.config;
 
-import com.campusrecycle.security.JwtAuthenticationFilter;
-import com.campusrecycle.security.JwtTokenProvider;
-import java.util.List;
-
+// Spring Core & Configuration Imports
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;                                     // <-- Add this if missing
+import org.springframework.context.annotation.Configuration;
+
+// Spring Security Core Imports
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;       // <-- Add this if missing
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+// CORS & Utility Imports
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import java.util.List;
 
+// Your Custom Project Security Imports
+import com.campusrecycle.security.JwtAuthenticationFilter;
+import com.campusrecycle.security.JwtTokenProvider;
 
 @Configuration
 @EnableWebSecurity
@@ -57,7 +62,8 @@ public class SecurityConfig {
                     "/auth/verify",
                     "/healthz",
                     "/actuator/**",
-                    "/recycling/items"
+                    "/recycling/items",
+                    "/users/leaderboard"   
                 ).permitAll()
                 .anyRequest().authenticated()
             )
