@@ -10,14 +10,15 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RecyclingSubmissionService {
@@ -40,15 +41,66 @@ public class RecyclingSubmissionService {
         this.userService = userService;
     }
 
+    /**
+        * 🛰️ Fetches the live root activeSession token ID string from the Realtime Database.
+        */
+    public CompletableFuture<String> getActiveSessionId() {
+        FirebaseDatabase db = FirebaseDatabase.getInstance();
+        DatabaseReference activeSessionRef = db.getReference("activeSession");
+        CompletableFuture<String> future = new CompletableFuture<>();
+
+        activeSessionRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                String activeSessionId = snapshot.getValue(String.class);
+                future.complete(activeSessionId != null ? activeSessionId : "");
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                future.completeExceptionally(error.toException());
+            }
+        });
+
+        return future;
+    }
+
     @Transactional
     public String processQrClaim(Long userId, String sessionId) throws ExecutionException, InterruptedException {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
-        DatabaseReference ref = FirebaseDatabase.getInstance()
-                .getReference("sessions")
-                .child(sessionId);
+        FirebaseDatabase db = FirebaseDatabase.getInstance();
 
+        // Step 1: Read the activeSession pointer from the DB root
+        DatabaseReference activeSessionRef = db.getReference("activeSession");
+        CompletableFuture<DataSnapshot> activeSessionFuture = new CompletableFuture<>();
+
+        activeSessionRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                activeSessionFuture.complete(snapshot);
+            }
+            @Override
+            public void onCancelled(DatabaseError error) {
+                activeSessionFuture.completeExceptionally(error.toException());
+            }
+        });
+
+        DataSnapshot activeSessionSnapshot = activeSessionFuture.get();
+        String activeSessionId = activeSessionSnapshot.getValue(String.class);
+
+        if (activeSessionId == null || activeSessionId.isBlank()) {
+            throw new RuntimeException("No active recycling session found on the bin right now.");
+        }
+
+        // Step 2: Confirm the session id the frontend sent matches the bin's active session
+        if (!activeSessionId.equals(sessionId)) {
+            throw new RuntimeException("This QR code does not match the bin's current active session. Please rescan.");
+        }
+
+        // Step 3: Fetch the confirmed session's data
+        DatabaseReference ref = db.getReference("sessions").child(activeSessionId);
         CompletableFuture<DataSnapshot> future = new CompletableFuture<>();
 
         ref.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -105,7 +157,6 @@ public class RecyclingSubmissionService {
         }
 
         userService.addPoints(userId, totalPoints);
-
         ref.child("status").setValueAsync("claimed");
 
         return "QR Verified! Processed " + plasticCount + " plastics and " + metalCount + " metals. +" + totalPoints + " Points!";
