@@ -49,32 +49,33 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/auth/login",
-                    "/auth/register",
-                    "/auth/verify",
-                    "/healthz",
-                    "/actuator/**",
-                    "/recycling/items",
-                    "/users/leaderboard", 
-                    "/analytics/**" 
-                ).permitAll()
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(
-                new JwtAuthenticationFilter(jwtTokenProvider),
-                UsernamePasswordAuthenticationFilter.class
-            );
+        public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+            http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session ->
+                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                    .requestMatchers(
+                        "/auth/login",
+                        "/auth/register",
+                        "/auth/verify",
+                        "/healthz",
+                        "/actuator/**",
+                        "/api/recycling/active-session", // 🔓 Allowed explicitly for the handshake
+                        "/api/recycling/items",
+                        "/api/users/leaderboard", 
+                        "/api/analytics/**" 
+                    ).permitAll()
+                    .anyRequest().authenticated()
+                )
+                .addFilterBefore(
+                    new JwtAuthenticationFilter(jwtTokenProvider),
+                    UsernamePasswordAuthenticationFilter.class
+                );
 
-        return http.build();
-    }
+            return http.build();
+        }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
