@@ -56,7 +56,7 @@ public class SecurityConfig {
                     "/healthz",
                     "/actuator/**",
                     "/api/recycling/active-session",
-                    "/api/recycling/items",
+                    "/api/recycling/stats", // 🟢 Public statistics pathway verified
                     "/api/users/leaderboard", 
                     "/api/analytics/**" 
                 ).permitAll()

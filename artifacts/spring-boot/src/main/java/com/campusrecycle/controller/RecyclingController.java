@@ -52,4 +52,27 @@ public class RecyclingController {
             return ResponseEntity.badRequest().body(new QrClaimResponse("ERROR", e.getMessage()));
         }
     }
+
+    /**
+     * 🔓 GET /api/recycling/stats
+     * Returns systemic campus statistics metrics, including the total global registration users.
+     */
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> getCampusStats() {
+        return ResponseEntity.ok(recyclingSubmissionService.getCampusStats());
+    }
+
+    /**
+     * 🔒 GET /api/recycling/user-profile
+     * Secured endpoint allowing logged-in user profiles to pull distinct count states & USN.
+     */
+    @GetMapping("/user-profile")
+    public ResponseEntity<Map<String, Object>> getUserProfile(Authentication authentication) {
+        try {
+            Long userId = Long.parseLong(authentication.getName());
+            return ResponseEntity.ok(recyclingSubmissionService.getUserDashboardProfile(userId));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to resolve profile info: " + e.getMessage()));
+        }
+    }
 }

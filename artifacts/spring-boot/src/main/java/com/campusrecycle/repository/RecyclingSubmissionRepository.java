@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-
 import java.util.List;
 
 @Repository
@@ -23,4 +22,8 @@ public interface RecyclingSubmissionRepository extends JpaRepository<RecyclingSu
 
     @Query("SELECT s.itemType, COUNT(s), SUM(s.quantity) FROM RecyclingSubmission s WHERE s.status = 'APPROVED' GROUP BY s.itemType")
     List<Object[]> getStatsByItemType();
+
+    // 🟢 Counts only distinct successfully approved recycling actions for a user
+    @Query("SELECT COUNT(s) FROM RecyclingSubmission s WHERE s.user.id = :userId AND s.status = 'APPROVED'")
+    long countApprovedSubmissionsByUserId(@Param("userId") Long userId);
 }

@@ -285,7 +285,7 @@ public class RecyclingSubmissionService {
 
     public Map<String, Object> getCampusStats() {
         List<Object[]> itemStats = submissionRepository.getStatsByItemType();
-        long totalUsers = userRepository.count();
+        long totalUsers = userRepository.count(); // 🟢 Calculated dynamically for the frontend counter
         long totalSubmissions = submissionRepository.count();
 
         long totalBottles = 0, totalCans = 0, totalPoints = 0;
@@ -307,7 +307,23 @@ public class RecyclingSubmissionService {
             "totalPoints", totalPoints,
             "totalBottles", totalBottles,
             "totalCans", totalCans,
-            "totalUsers", totalUsers
+            "totalUsers", totalUsers // 🟢 Delivered down into campus stats map payload
+        );
+    }
+
+    /**
+     * 📊 Fetch dashboard data summaries for a specific logged-in user profile view
+     */
+    public Map<String, Object> getUserDashboardProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        long sessionsCount = submissionRepository.countApprovedSubmissionsByUserId(userId);
+
+        return Map.of(
+            "userId", userId,
+            "usn", user.getUsn() != null ? user.getUsn() : "N/A", // 🟢 Returns User's USN configuration
+            "totalSessions", sessionsCount // 🟢 Returns individual user completed metrics
         );
     }
 
