@@ -42,9 +42,10 @@ public class RecyclingSubmissionService {
     }
 
     /**
-        * 🛰️ Fetches the live root activeSession token ID string from the Realtime Database.
-        */
+     * 🛰️ Fetches the live root activeSession token ID string from the Realtime Database.
+     */
     public CompletableFuture<String> getActiveSessionId() {
+        System.out.println("🛰️ [LOG] Fetching current activeSessionId token from Firebase...");
         FirebaseDatabase db = FirebaseDatabase.getInstance();
         DatabaseReference activeSessionRef = db.getReference("activeSession");
         CompletableFuture<String> future = new CompletableFuture<>();
@@ -53,11 +54,13 @@ public class RecyclingSubmissionService {
             @Override
             public void onDataChange(DataSnapshot snapshot) {
                 String activeSessionId = snapshot.getValue(String.class);
+                System.out.println("🛰️ [LOG] Firebase activeSession root reads: " + activeSessionId);
                 future.complete(activeSessionId != null ? activeSessionId : "");
             }
 
             @Override
             public void onCancelled(DatabaseError error) {
+                System.out.println("❌ [LOG ERROR] Firebase activeSession check failed: " + error.getMessage());
                 future.completeExceptionally(error.toException());
             }
         });
@@ -67,12 +70,24 @@ public class RecyclingSubmissionService {
 
     @Transactional
     public String processQrClaim(Long userId, String sessionId) throws ExecutionException, InterruptedException {
+        System.out.println("\n========================================================");
+        System.out.println("🚀 [QR CLAIM START] Incoming claim transaction triggered!");
+        System.out.println("📍 Parameter User ID: " + userId);
+        System.out.println("📍 Parameter Session ID: " + sessionId);
+        System.out.println("========================================================");
+
+        System.out.println("🔍 [STEP 1] Confirming if User ID exists in Neon Postgres...");
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                .orElseThrow(() -> {
+                    System.out.println("❌ [CRITICAL] User lookup failed for ID: " + userId);
+                    return new RuntimeException("User not found: " + userId);
+                });
+        System.out.println("🟢 User verified successfully in database. Internal User reference secured.");
 
         FirebaseDatabase db = FirebaseDatabase.getInstance();
 
         // Step 1: Read the activeSession pointer from the DB root
+        System.out.println("🔍 [STEP 2] Validating active hardware token in Firebase...");
         DatabaseReference activeSessionRef = db.getReference("activeSession");
         CompletableFuture<DataSnapshot> activeSessionFuture = new CompletableFuture<>();
 
@@ -89,17 +104,23 @@ public class RecyclingSubmissionService {
 
         DataSnapshot activeSessionSnapshot = activeSessionFuture.get();
         String activeSessionId = activeSessionSnapshot.getValue(String.class);
+        System.out.println("📄 Firebase Active Bin Token: [" + activeSessionId + "]");
 
         if (activeSessionId == null || activeSessionId.isBlank()) {
+            System.out.println("❌ [ABORT] activeSession root value is completely empty inside Firebase!");
             throw new RuntimeException("No active recycling session found on the bin right now.");
         }
 
         // Step 2: Confirm the session id the frontend sent matches the bin's active session
+        System.out.println("🔍 [STEP 3] Comparing Frontend Token against Live Hardware Snapshot...");
         if (!activeSessionId.equals(sessionId)) {
+            System.out.println("❌ [ABORT] Handshake mismatch! Frontend passed: " + sessionId + " | Active: " + activeSessionId);
             throw new RuntimeException("This QR code does not match the bin's current active session. Please rescan.");
         }
+        System.out.println("🟢 Handshake Token match confirmed!");
 
         // Step 3: Fetch the confirmed session's data
+        System.out.println("🔍 [STEP 4] Downloading full session nodes payload from Firebase...");
         DatabaseReference ref = db.getReference("sessions").child(activeSessionId);
         CompletableFuture<DataSnapshot> future = new CompletableFuture<>();
 
@@ -117,52 +138,118 @@ public class RecyclingSubmissionService {
         DataSnapshot snapshot = future.get();
 
         if (!snapshot.exists()) {
+            System.out.println("❌ [ABORT] Node lookup returned null. Target path key doesn't exist: sessions/" + activeSessionId);
             throw new RuntimeException("Invalid QR Code: This recycling session does not exist!");
         }
 
-        String status = snapshot.child("status").getValue(String.class);
-        if (status == null) {
-            throw new RuntimeException("Corrupted data payload: Missing active status state!");
+        // 🛑 --- STEP 4 DIAGNOSTICS: EXTRACTING & VALIDATING DATA FROM SNAPSHOT ---
+        System.out.println("\n🔍 [STEP 4 DIAGNOSTICS] Reading and Validating Firebase Data Payload Nodes...");
+        String status = null;
+        int plasticCount = 0;
+        int metalCount = 0;
+        int totalPoints = 0;
+
+        try {
+            status = snapshot.child("status").getValue(String.class);
+            System.out.println("   👉 Raw status string from Firebase: '" + status + "'");
+
+            if (status == null) {
+                System.out.println("❌ [ABORT STEP 4] Status variable string returned null pointer lifecycle flag!");
+                throw new RuntimeException("Corrupted data payload: Missing active status state!");
+            }
+
+            if ("active".equalsIgnoreCase(status)) {
+                System.out.println("❌ [ABORT STEP 4] Bin is still accepting items. Status cannot be active during claims.");
+                throw new RuntimeException("Session is still active! Please wait for the hardware bin to finish processing your items.");
+            }
+
+            if ("claimed".equalsIgnoreCase(status)) {
+                System.out.println("❌ [ABORT STEP 4] Session double-spend prevented! Status already marked 'claimed'.");
+                throw new RuntimeException("This QR code has already been claimed by another student!");
+            }
+
+            if (!"completed".equalsIgnoreCase(status)) {
+                System.out.println("❌ [ABORT STEP 4] Invalid status configuration block found: " + status);
+                throw new RuntimeException("Invalid session state: Cannot claim a '" + status + "' session.");
+            }
+
+            Integer plasticCountObj = snapshot.child("plasticCount").getValue(Integer.class);
+            Integer metalCountObj = snapshot.child("metalCount").getValue(Integer.class);
+
+            System.out.println("   👉 Raw plasticCount object wrapper: " + plasticCountObj);
+            System.out.println("   👉 Raw metalCount object wrapper: " + metalCountObj);
+
+            plasticCount = plasticCountObj != null ? plasticCountObj : 0;
+            metalCount = metalCountObj != null ? metalCountObj : 0;
+
+            totalPoints = (plasticCount * POINTS_PER_PLASTIC) + (metalCount * POINTS_PER_METAL);
+            System.out.println("   📊 Evaluated Metrics -> Plastics: " + plasticCount + " | Metals: " + metalCount + " | Total Points: " + totalPoints);
+
+            if (totalPoints == 0) {
+                System.out.println("❌ [ABORT STEP 4] Points pool evaluated to 0. Stopping database execution pipeline.");
+                throw new RuntimeException("No items were detected in this recycling session.");
+            }
+            System.out.println("🟢 [STEP 4 SUCCESS] Snapshot parsed cleanly. Data is structurally sound.");
+        } catch (Exception e) {
+            System.out.println("💥 [CRITICAL FAILURE IN STEP 4] Error parsing snapshot or checking session boundaries!");
+            System.out.println("   Details: " + e.getMessage());
+            throw e;
         }
 
-        if ("active".equalsIgnoreCase(status)) {
-            throw new RuntimeException("Session is still active! Please wait for the hardware bin to finish processing your items.");
+        // 🛑 --- STEP 5 DIAGNOSTICS: SENDING DATA INSERT STATEMENTS TO NEON POSTGRES ---
+        System.out.println("\n⚡ [STEP 5 DIAGNOSTICS] Initiating Neon Postgres Storage Save Routine via Hibernate...");
+        try {
+            if (plasticCount > 0) {
+                int plasticPoints = plasticCount * POINTS_PER_PLASTIC;
+                System.out.println("   📝 [STEP 5a] Persisting plastic row entry: " + plasticCount + " x " + ITEM_PLASTIC);
+                saveAutomatedRecord(user, ITEM_PLASTIC, plasticCount, plasticPoints);
+                System.out.println("   🟢 [STEP 5a SUCCESS] Plastic record row stored in Hibernate persistence context.");
+            }
+            if (metalCount > 0) {
+                int metalPoints = metalCount * POINTS_PER_METAL;
+                System.out.println("   📝 [STEP 5b] Persisting metal row entry: " + metalCount + " x " + ITEM_METAL);
+                saveAutomatedRecord(user, ITEM_METAL, metalCount, metalPoints);
+                System.out.println("   🟢 [STEP 5b SUCCESS] Metal record row stored in Hibernate persistence context.");
+            }
+            System.out.println("🟢 [STEP 5 SUCCESS] All individual item records written successfully.");
+        } catch (Exception dbEx) {
+            System.out.println("💥 [CRITICAL CRASH IN STEP 5] Neon Postgres transaction failed during submission save!");
+            System.out.println("   Details: " + dbEx.getMessage());
+            dbEx.printStackTrace();
+            throw dbEx;
         }
 
-        if ("claimed".equalsIgnoreCase(status)) {
-            throw new RuntimeException("This QR code has already been claimed by another student!");
+        // 🛑 --- STEP 6 DIAGNOSTICS: USER BALANCES UPDATE ---
+        System.out.println("\n🛰️ [STEP 6 DIAGNOSTICS] Invoking point balance increment inside userService...");
+        try {
+            System.out.println("   📝 Adding +" + totalPoints + " reward allocation points to User ID: " + userId);
+            userService.addPoints(userId, totalPoints);
+            System.out.println("   🟢 [STEP 6 SUCCESS] User entity point balances adjusted successfully without rollbacks.");
+        } catch (Exception userEx) {
+            System.out.println("💥 [CRITICAL CRASH IN STEP 6] Point balance mutation failed inside User Service layer!");
+            System.out.println("   Details: " + userEx.getMessage());
+            throw userEx;
         }
 
-        if (!"completed".equalsIgnoreCase(status)) {
-            throw new RuntimeException("Invalid session state: Cannot claim a '" + status + "' session.");
+        // 🛑 --- STEP 7 DIAGNOSTICS: FIREBASE STATE CLOSURE ---
+        System.out.println("\n🔒 [STEP 7 DIAGNOSTICS] Sending synchronization updates to change status token node to 'claimed'...");
+        try {
+            ref.child("status").setValueAsync("claimed");
+            System.out.println("   🟢 [STEP 7 SUCCESS] Async claim update token successfully dispatched to Firebase reference.");
+        } catch (Exception fbEx) {
+            System.out.println("💥 [CRITICAL CRASH IN STEP 7] Firebase node status lock assignment failed!");
+            System.out.println("   Details: " + fbEx.getMessage());
+            throw fbEx;
         }
 
-        Integer plasticCountObj = snapshot.child("plasticCount").getValue(Integer.class);
-        Integer metalCountObj = snapshot.child("metalCount").getValue(Integer.class);
-
-        int plasticCount = plasticCountObj != null ? plasticCountObj : 0;
-        int metalCount = metalCountObj != null ? metalCountObj : 0;
-
-        int totalPoints = (plasticCount * POINTS_PER_PLASTIC) + (metalCount * POINTS_PER_METAL);
-
-        if (totalPoints == 0) {
-            throw new RuntimeException("No items were detected in this recycling session.");
-        }
-
-        if (plasticCount > 0) {
-            saveAutomatedRecord(user, ITEM_PLASTIC, plasticCount, plasticCount * POINTS_PER_PLASTIC);
-        }
-        if (metalCount > 0) {
-            saveAutomatedRecord(user, ITEM_METAL, metalCount, metalCount * POINTS_PER_METAL);
-        }
-
-        userService.addPoints(userId, totalPoints);
-        ref.child("status").setValueAsync("claimed");
+        System.out.println("\n🏁 [QR CLAIM END] Transaction finalized safely. Sending response body string.");
+        System.out.println("========================================================\n");
 
         return "QR Verified! Processed " + plasticCount + " plastics and " + metalCount + " metals. +" + totalPoints + " Points!";
     }
 
     private void saveAutomatedRecord(User user, String itemType, int qty, int points) {
+        System.out.println("     ↳ [Repository Trigger] Saving entry properties to `submissionRepository`: " + qty + "x " + itemType);
         RecyclingSubmission submission = new RecyclingSubmission();
         submission.setUser(user);
         submission.setItemType(itemType); 
@@ -176,6 +263,7 @@ public class RecyclingSubmissionService {
 
     @Transactional
     public RecyclingSubmission submit(Long userId, SubmissionRequest request) {
+        System.out.println("📝 [LOG] Internal manually typed submission dashboard handler triggered.");
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
