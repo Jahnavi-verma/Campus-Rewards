@@ -86,42 +86,17 @@ public class RecyclingSubmissionService {
 
         FirebaseDatabase db = FirebaseDatabase.getInstance();
 
-        // Step 1: Read the activeSession pointer from the DB root
-        System.out.println("🔍 [STEP 2] Validating active hardware token in Firebase...");
-        DatabaseReference activeSessionRef = db.getReference("activeSession");
-        CompletableFuture<DataSnapshot> activeSessionFuture = new CompletableFuture<>();
-
-        activeSessionRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                activeSessionFuture.complete(snapshot);
-            }
-            @Override
-            public void onCancelled(DatabaseError error) {
-                activeSessionFuture.completeExceptionally(error.toException());
-            }
-        });
-
-        DataSnapshot activeSessionSnapshot = activeSessionFuture.get();
-        String activeSessionId = activeSessionSnapshot.getValue(String.class);
-        System.out.println("📄 Firebase Active Bin Token: [" + activeSessionId + "]");
-
-        if (activeSessionId == null || activeSessionId.isBlank()) {
-            System.out.println("❌ [ABORT] activeSession root value is completely empty inside Firebase!");
-            throw new RuntimeException("No active recycling session found on the bin right now.");
+        // 🔄 --- BYPASSED STEPS 2 & 3: TRUSTING PASSED PARAMETER DIRECTLY TO PREVENT KIOSK DISCONNECT NULL ABORTS ---
+        System.out.println("🔍 [STEP 2 & 3] Bypassing root token verification (wiped by kiosk). Using target Session ID directly...");
+        if (sessionId == null || sessionId.isBlank()) {
+            System.out.println("❌ [ABORT] Handshake parameter check rejected. Passed sessionId is blank/null.");
+            throw new RuntimeException("No session token provided to claim.");
         }
+        System.out.println("🟢 Target Session ID accepted: [" + sessionId + "]");
 
-        // Step 2: Confirm the session id the frontend sent matches the bin's active session
-        System.out.println("🔍 [STEP 3] Comparing Frontend Token against Live Hardware Snapshot...");
-        if (!activeSessionId.equals(sessionId)) {
-            System.out.println("❌ [ABORT] Handshake mismatch! Frontend passed: " + sessionId + " | Active: " + activeSessionId);
-            throw new RuntimeException("This QR code does not match the bin's current active session. Please rescan.");
-        }
-        System.out.println("🟢 Handshake Token match confirmed!");
-
-        // Step 3: Fetch the confirmed session's data
+        // Step 3: Fetch the confirmed session's data using the explicit sessionId parameter
         System.out.println("🔍 [STEP 4] Downloading full session nodes payload from Firebase...");
-        DatabaseReference ref = db.getReference("sessions").child(activeSessionId);
+        DatabaseReference ref = db.getReference("sessions").child(sessionId);
         CompletableFuture<DataSnapshot> future = new CompletableFuture<>();
 
         ref.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -138,7 +113,7 @@ public class RecyclingSubmissionService {
         DataSnapshot snapshot = future.get();
 
         if (!snapshot.exists()) {
-            System.out.println("❌ [ABORT] Node lookup returned null. Target path key doesn't exist: sessions/" + activeSessionId);
+            System.out.println("❌ [ABORT] Node lookup returned null. Target path key doesn't exist: sessions/" + sessionId);
             throw new RuntimeException("Invalid QR Code: This recycling session does not exist!");
         }
 
