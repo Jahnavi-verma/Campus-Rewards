@@ -14,6 +14,9 @@ spring:
       max-lifetime: 600000
       connection-timeout: 30000
       initialization-fail-timeout: 0
+      # 🔄 Add these two lines to test and wake up Neon safely:
+      connection-test-query: SELECT 1
+      keepalive-time: 30000
   jpa:
     open-in-view: false
     database: postgresql
