@@ -8,15 +8,20 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    // Used for the login system
     Optional<User> findByEmail(String email);
 
-    // Used to prevent duplicate accounts during registration
     Boolean existsByEmail(String email);
 
-    // 🌟 ADD THIS: Checks if a USN is already registered in Supabase
     Boolean existsByUsn(String usn);
 
-    // Kept for backward compatibility
     Optional<User> findByGithubId(String githubId);
+
+    // 🟢 ADDED: Directly update Neon Postgres to bypass Spring Security principal checks
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("UPDATE User u SET u.points = :points, u.avatarUrl = :level WHERE u.id = :id")
+    void updatePointsAndLevel(
+        @org.springframework.data.repository.query.Param("id") Long id, 
+        @org.springframework.data.repository.query.Param("points") int points, 
+        @org.springframework.data.repository.query.Param("level") String level
+    );
 }
