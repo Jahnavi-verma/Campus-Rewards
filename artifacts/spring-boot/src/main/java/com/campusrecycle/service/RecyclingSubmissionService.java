@@ -207,15 +207,15 @@ public class RecyclingSubmissionService {
         }
 
         // 🛑 --- STEP 7 DIAGNOSTICS: FIREBASE STATE CLOSURE ---
-        System.out.println("\n🔒 [STEP 7 DIAGNOSTICS] Sending synchronization updates to change status token node to 'claimed'...");
-        try {
+        //System.out.println("\n🔒 [STEP 7 DIAGNOSTICS] Sending synchronization updates to change status token node to 'claimed'...");
+        /*try {
             ref.child("status").setValueAsync("claimed");
             System.out.println("   🟢 [STEP 7 SUCCESS] Async claim update token successfully dispatched to Firebase reference.");
         } catch (Exception fbEx) {
             System.out.println("💥 [CRITICAL CRASH IN STEP 7] Firebase node status lock assignment failed!");
             System.out.println("   Details: " + fbEx.getMessage());
             throw fbEx;
-        }
+        }*/
 
         System.out.println("\n🏁 [QR CLAIM END] Transaction finalized safely. Sending response body string.");
         System.out.println("========================================================\n");
