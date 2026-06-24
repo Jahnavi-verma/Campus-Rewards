@@ -1,0 +1,37 @@
+Please perform a clean backend refactor to save the user's updated level to Neon Postgres during the recycling reward transaction, without invalidating the active user session or triggering a transaction rollback.
+🔍 The Bug & Faculty Requirement
+The Bug: Overwriting user.setAvatarUrl(...) inside UserService.addPoints alters a core security profile field while the user is actively authenticated. This causes Spring Security to invalidate the user session, crashing the transaction and forcing a logout.
+The Requirement: The faculty requires the calculated level title to be saved down into Neon Postgres when points change.
+🛠️ Required Changes
+Please implement this two-step fix:
+Step 1: Check or Add a Dedicated Level Column in com.campusrecycle.model.User.java
+Ensure the User entity has a clean, dedicated field for the level title (e.g., levelTitle) so we don't hijack avatarUrl or any security-critical field.
+If a levelTitle property/column doesn't exist yet, please create a standard getter/setter pair for it in User.java:
+Java
+private String levelTitle;
+
+public String getLevelTitle() { return levelTitle; }
+public void setLevelTitle(String levelTitle) { this.levelTitle = levelTitle; }
+Step 2: Safely update both Points and Level in com.campusrecycle.service.UserService.java
+Update the addPoints method. Instead of touching avatarUrl, calculate the level using LevelUtils and save it directly to the dedicated levelTitle property before executing userRepository.save(user).
+Update the method to look exactly like this:
+Java
+@Transactional
+public User addPoints(Long userId, int pointsToAdd) {
+    User user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+    // 1. Calculate and update the new point totals cleanly
+    int newPoints = user.getPoints() + pointsToAdd;
+    user.setPoints(newPoints);
+
+    // 2. 🟢 SAFE LEVEL UPDATE: Save the title to a dedicated level column. 
+    // Do NOT modify user.setAvatarUrl() here, as it breaks the Spring Security session.
+    String updatedLevel = LevelUtils.getLevel(newPoints).title();
+    user.setLevelTitle(updatedLevel); 
+
+    System.out.println("📊 [DATABASE UPDATE] Updating User ID " + userId + " to " + newPoints + " points and Level: " + updatedLevel);
+
+    return userRepository.save(user);
+}
+Step 3: Verify the Build

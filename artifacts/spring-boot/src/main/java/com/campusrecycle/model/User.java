@@ -23,6 +23,8 @@ public class User {
 
     private String avatarUrl;
 
+    private String levelTitle;
+
     // 🌟 ADD THIS FIELD: Map the USN parameter to the column configuration
     @Column(unique = true)
     private String usn;
@@ -63,6 +65,9 @@ public class User {
 
     public String getAvatarUrl() { return avatarUrl; }
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+
+    public String getLevelTitle() { return levelTitle; }
+    public void setLevelTitle(String levelTitle) { this.levelTitle = levelTitle; }
 
     // 🌟 ADD THESE USN METHODS
     public String getUsn() { return usn; }

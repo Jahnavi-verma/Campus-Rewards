@@ -43,8 +43,8 @@
             user.setRole("USER"); 
             user.setCreatedAt(LocalDateTime.now());
 
-            // ✨ ADDED: Sync the baseline Level Title ("Sapling") immediately upon registration!
-            user.setAvatarUrl(LevelUtils.getLevel(WELCOME_BONUS).title());
+            // ✨ Set the baseline level title on a dedicated column (not avatarUrl)
+            user.setLevelTitle(LevelUtils.getLevel(WELCOME_BONUS).title());
 
             return userRepository.save(user);
         }
@@ -63,7 +63,7 @@
 
                 // Sync dynamic level titles on GitHub login if they have point history
                 LevelUtils.LevelInfo info = LevelUtils.getLevel(user.getPoints());
-                user.setAvatarUrl(info.title());
+                user.setLevelTitle(info.title());
 
                 user.setLastLoginAt(LocalDateTime.now());
                 return userRepository.save(user);
@@ -74,7 +74,7 @@
             user.setEmail(email);
             user.setName(name);
             user.setPoints(WELCOME_BONUS);
-            user.setAvatarUrl(LevelUtils.getLevel(WELCOME_BONUS).title()); // Set default level title
+            user.setLevelTitle(LevelUtils.getLevel(WELCOME_BONUS).title()); // Set default level title
             user.setRole("USER");
             user.setCreatedAt(LocalDateTime.now());
             return userRepository.save(user);
@@ -93,14 +93,17 @@
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            // 1. Add the incoming points to their current total
+            // 1. Calculate and update the new point totals cleanly
             int newPoints = user.getPoints() + pointsToAdd;
             user.setPoints(newPoints);
 
-            // 2. 🔥 CALCULATE NEW LEVEL TITLE AND SYNC IT TO THE DATABASE COLUMN
-            user.setAvatarUrl(LevelUtils.getLevel(newPoints).title()); 
+            // 2. 🟢 SAFE LEVEL UPDATE: Save the title to a dedicated level column.
+            // Do NOT modify user.setAvatarUrl() here, as it breaks the Spring Security session.
+            String updatedLevel = LevelUtils.getLevel(newPoints).title();
+            user.setLevelTitle(updatedLevel);
 
-            // 3. Save the updated user row back to the database
+            System.out.println("📊 [DATABASE UPDATE] Updating User ID " + userId + " to " + newPoints + " points and Level: " + updatedLevel);
+
             return userRepository.save(user);
         }
     }
